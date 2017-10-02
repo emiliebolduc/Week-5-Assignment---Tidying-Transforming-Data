@@ -1,0 +1,123 @@
+---
+title: "CUNY Data 607 – Week 5 Assignment – Tidying and Transforming Data"
+author: "Emilie M Bolduc"
+date: "10/1/2017"
+output: html_document
+---
+
+# Assignment 
+1. Create a .CSV file (or optionally, a MySQL database!) that includes all of the information above. You’re encouraged to use a “wide” structure similar to how the information appears above, so that you can practice tidying and transformations as described below.
+2. Read the information from your .CSV file into R, and use tidyr and dplyr as needed to tidy and transform your data.
+3. Perform analysis to compare the arrival delays for the two airlines.
+
+# Solution
+### Read CSV
+Took the data provided and typed it into a CSV table that I then uploaded into R.
+```{r}
+library(readr)
+Airline_delays <- read_csv("~/Documents/CUNY Data 607/data/airlines/Airline_delays.csv")
+Airline_delays
+```
+
+### Tidy Data
+#### 1. Fill first column with complete row names
+The carrier names in the first column were not populated across all rows, so needed to fill the remaining rows in that column with the Carrier name.
+```{r}
+library(tidyr)
+Airline <- Airline_delays %>% fill(X1)
+Airline
+```
+Reference: https://blog.rstudio.com/2015/09/13/tidyr-0-3-0/
+
+#### 2. Remove rows with NAs
+There was an uncessary empty row in the original CSV file which appeared as NA when uploaded into R, so had to remove it.
+```{r}
+Airline <- na.omit(Airline)
+```
+
+#### 3. Make observations from variables with tidyr 'gather' function
+i.e. Change the City column data into observations rows.
+```{r}
+Airline <- gather(Airline, "City", "n", 3:7)
+Airline
+```
+
+#### 4. Make variables from observations with tidyr 'spread' function
+i.e. Take the "On Time" and "Delayed" row variables and turn them into observations.
+```{r}
+Airline <- spread(Airline, "X2", "n")
+Airline
+```
+
+#### 5. Change column names with 'dplyr' fucntions
+```{r}
+library(dplyr)
+Airline <- dplyr::rename(Airline, Carrier = X1)
+Airline <- dplyr::rename(Airline, Delayed = delayed)
+Airline <- dplyr::rename(Airline, On_Time = 'on time')
+Airline
+```
+
+I still find the following function quicker and easier...
+
+> colnames(Airline)<- c("Carrier","City","Delayed", "On Time")
+
+### Perform Analysis with 'dplyr'
+Taking a look at the data:
+```{r}
+dplyr::glimpse(Airline)
+```
+
+Look at the number of delays by Carrier:
+```{r}
+select(Airline, Carrier, Delayed)
+```
+
+Mean and median of all Delays:
+```{r}
+dplyr::summarise(Airline, Mean = mean(Delayed), Median = median(Delayed))
+```
+
+Look at the number of delays in descending order:
+```{r}
+dplyr::arrange(Airline, desc(Delayed))
+```
+
+Number of delays in ascending order by Carrier:
+```{r}
+dplyr::arrange(Airline, Carrier, Delayed)
+```
+
+The mean and sum of delays by Carrier:
+```{r}
+Carrier <- Airline %>% group_by(Carrier) %>% 
+  summarise(mean = mean(Delayed), sum = sum(Delayed), n = n())
+Carrier
+```
+
+The mean and sum of delays by City:
+```{r}
+City <- Airline %>% group_by(City) %>% 
+  summarise(mean = mean(Delayed), sum = sum(Delayed)) %>% 
+  arrange(desc(mean))
+City
+```
+
+
+### Visualize the Analysis
+Create table to use for visualizing data:
+```{r}
+CityCarrier <- Airline %>% group_by(City, Carrier) %>% 
+  summarise(mean = mean(Delayed), sum = sum(Delayed))
+```
+
+#### Carrier Delays By City
+```{r}
+library(scales)
+library(ggplot2)
+LineGraph <- ggplot(CityCarrier, aes(x = City, y = mean))
+LineGraph <- LineGraph + geom_line(aes(color=factor(Carrier), group = Carrier))
+LineGraph <- LineGraph + scale_color_discrete(name = "Carrier")
+LineGraph <- LineGraph + labs(title = "Carrier Delays by City", x = "City", y = "Total Number of Delays")
+LineGraph
+```
